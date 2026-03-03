@@ -5,16 +5,17 @@ Revises:
 Create Date: 2026-03-03
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSON
 
+from alembic import op
+
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -28,9 +29,10 @@ def upgrade() -> None:
         sa.Column("description", sa.String(), nullable=False),
         sa.Column("sections", JSON(), nullable=True),
         sa.Column("evaluation", JSON(), nullable=True),
-        sa.Column("metadata", JSON(), nullable=True),
+        sa.Column("generation_metadata", JSON(), nullable=True),
         sa.Column("focus_areas", JSON(), nullable=True),
         sa.Column("tech_stack", JSON(), nullable=True),
+        sa.Column("status", sa.String(), nullable=False, server_default="pending"),
         sa.Column(
             "created_at",
             sa.DateTime(),
@@ -38,6 +40,7 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
+    op.create_index("ix_guides_product_role", "guides", ["product", "role"])
 
     op.create_table(
         "evaluation_runs",
@@ -62,4 +65,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("evaluation_runs")
+    op.drop_index("ix_guides_product_role", table_name="guides")
     op.drop_table("guides")

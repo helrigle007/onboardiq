@@ -1,7 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, func
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy import JSON, DateTime, Float, Index, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -20,11 +19,16 @@ class Guide(Base):
     description: Mapped[str] = mapped_column(String, nullable=False)
     sections: Mapped[dict] = mapped_column(JSON, nullable=True)
     evaluation: Mapped[dict] = mapped_column(JSON, nullable=True)
-    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=True)
+    generation_metadata: Mapped[dict] = mapped_column("generation_metadata", JSON, nullable=True)
     focus_areas: Mapped[dict] = mapped_column(JSON, nullable=True)
     tech_stack: Mapped[dict] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_guides_product_role", "product", "role"),
     )
 
 
