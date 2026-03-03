@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.models.schemas import ProductInfo, ProductListResponse, UserRole
 from app.rag.retriever import HybridRetriever
-from app.rag.vectorstore import get_collection_stats
 
 router = APIRouter()
 
