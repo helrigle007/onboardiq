@@ -38,8 +38,8 @@ export function useSSE({ guideId, onEvent }: UseSSEOptions): UseSSEReturn {
           es.close();
           setIsConnected(false);
         }
-      } catch (e) {
-        console.error('SSE parse error:', e);
+      } catch {
+        // Silently ignore malformed SSE data
       }
     };
 

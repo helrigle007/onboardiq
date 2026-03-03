@@ -13,4 +13,14 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'syntax-highlighter': ['react-syntax-highlighter'],
+          recharts: ['recharts'],
+        },
+      },
+    },
+  },
 })
