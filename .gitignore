@@ -16,7 +16,6 @@ frontend/dist/
 
 # Data
 backend/data/chroma/
-backend/data/docs/stripe/*.md
 *.db
 
 # IDE
