@@ -1,0 +1,49 @@
+name: Weekly Evaluation
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday at 6am UTC
+  workflow_dispatch:       # Manual trigger
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: onboardiq_eval
+          POSTGRES_USER: onboardiq
+          POSTGRES_PASSWORD: onboardiq
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: cd backend && pip install -e "."
+
+      - name: Run RAGAS evaluation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+          DATABASE_URL: postgresql+asyncpg://onboardiq:onboardiq@localhost:5432/onboardiq_eval
+        run: |
+          cd backend
+          python -m app.evaluation.ragas_eval --all > eval_results.json
+
+      - name: Upload evaluation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_number }}
+          path: backend/eval_results.json
