@@ -1,10 +1,18 @@
-## Summary
+## What
+<!-- Brief description of changes -->
 
-## Changes
+## Why
+<!-- Motivation / problem solved -->
 
-## Testing
+## Type
+- [ ] Feature
+- [ ] Bug fix
+- [ ] Documentation
+- [ ] Refactor
+- [ ] DevOps
 
 ## Checklist
-- [ ] Tests pass
-- [ ] Linting passes
-- [ ] Documentation updated
+- [ ] Tests pass (`make test`)
+- [ ] Lint passes (`make lint`)
+- [ ] Updated docs if needed
+- [ ] No console.log / print statements left
