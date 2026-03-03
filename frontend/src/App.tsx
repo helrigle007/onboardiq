@@ -1,23 +1,39 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import type { SupportedProduct, GuideRequest, GuideResponse } from './types';
 import { ProductSelector } from './components/ProductSelector';
 import { RoleConfigurator } from './components/RoleConfigurator';
 import { GenerationView } from './components/GenerationView';
-import { GuideViewer } from './components/GuideViewer';
+import { LoadingSpinner } from './components/Skeleton';
+import { usePageTitle } from './hooks/usePageTitle';
+
+const GuideViewer = lazy(() => import('./components/GuideViewer'));
 
 type AppPage = 'select' | 'configure' | 'generating' | 'viewing';
+
+const PAGE_TITLES: Record<AppPage, string> = {
+  select: 'OnboardIQ \u2014 Choose Product',
+  configure: 'OnboardIQ \u2014 Configure Guide',
+  generating: 'OnboardIQ \u2014 Generating...',
+  viewing: 'OnboardIQ',
+};
 
 export default function App() {
   const [page, setPage] = useState<AppPage>('select');
   const [selectedProduct, setSelectedProduct] = useState<SupportedProduct | null>(null);
   const [completedGuide, setCompletedGuide] = useState<GuideResponse | null>(null);
 
+  const pageTitle = page === 'viewing' && completedGuide
+    ? `OnboardIQ \u2014 ${completedGuide.title}`
+    : PAGE_TITLES[page];
+  usePageTitle(pageTitle);
+
   function handleProductSelect(product: SupportedProduct) {
     setSelectedProduct(product);
     setPage('configure');
   }
 
-  function handleGenerate(_request: GuideRequest) {
+  function handleGenerate(_: GuideRequest): void {
+    void _;
     setPage('generating');
   }
 
@@ -36,7 +52,7 @@ export default function App() {
     <div className="min-h-screen bg-[#fafafa] flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 shrink-0">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1
               className="text-lg font-semibold text-slate-900 cursor-pointer"
@@ -63,13 +79,13 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
         {page === 'select' && (
-          <div className="py-16 px-6">
+          <div className="py-10 sm:py-16 px-4 sm:px-6">
             <ProductSelector onSelect={handleProductSelect} />
           </div>
         )}
 
         {page === 'configure' && selectedProduct && (
-          <div className="py-10 px-6">
+          <div className="py-6 sm:py-10 px-4 sm:px-6">
             <RoleConfigurator
               product={selectedProduct as 'stripe'}
               onGenerate={handleGenerate}
@@ -79,13 +95,15 @@ export default function App() {
         )}
 
         {page === 'generating' && (
-          <div className="py-10 px-6">
+          <div className="py-6 sm:py-10 px-4 sm:px-6">
             <GenerationView onComplete={handleGenerationComplete} />
           </div>
         )}
 
         {page === 'viewing' && completedGuide && (
-          <GuideViewer guide={completedGuide} onBack={handleBackToStart} />
+          <Suspense fallback={<LoadingSpinner />}>
+            <GuideViewer guide={completedGuide} onBack={handleBackToStart} />
+          </Suspense>
         )}
       </main>
 

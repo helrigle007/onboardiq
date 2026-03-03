@@ -146,11 +146,11 @@ export function RoleConfigurator({ product, onGenerate, onBack }: RoleConfigurat
         <p className="text-slate-500">Select your role and customize the guide to your needs</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left column — Role selection */}
         <div>
           <h3 className="text-sm font-medium text-slate-700 mb-3">Select Role</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {roles.map(({ role, label, Icon, description }) => {
               const isSelected = selectedRole === role;
               return (

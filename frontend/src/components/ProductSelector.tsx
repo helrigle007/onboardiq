@@ -47,7 +47,7 @@ export function ProductSelector({ onSelect }: ProductSelectorProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {products.map(({ id, name, description, Icon, available, docCount, chunkCount }) => (
           <button
             key={id}
@@ -75,13 +75,19 @@ export function ProductSelector({ onSelect }: ProductSelectorProps) {
             </div>
             <h3 className="text-lg font-semibold text-slate-900 mb-1">{name}</h3>
             <p className="text-sm text-slate-500 mb-4">{description}</p>
-            {available && (
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                <span>{docCount.toLocaleString()} docs</span>
-                <span className="w-1 h-1 rounded-full bg-slate-300" />
-                <span>{chunkCount.toLocaleString()} chunks</span>
-              </div>
-            )}
+            {available ? (
+              chunkCount > 0 ? (
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span>{docCount.toLocaleString()} docs</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  <span>{chunkCount.toLocaleString()} chunks</span>
+                </div>
+              ) : (
+                <div className="text-xs text-amber-600">
+                  Documentation not yet ingested. Run <code className="bg-amber-50 px-1 rounded">make ingest</code>
+                </div>
+              )
+            ) : null}
           </button>
         ))}
       </div>
