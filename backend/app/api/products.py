@@ -1,9 +1,14 @@
-"""Product endpoints with debug retrieval for the RAG pipeline."""
+"""Product endpoints with debug retrieval and ingestion trigger."""
+
+import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.models.schemas import ProductInfo, ProductListResponse, UserRole
+from app.rag.ingestion import run_ingestion
 from app.rag.retriever import HybridRetriever
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,6 +35,21 @@ PRODUCTS = {
 @router.get("/", response_model=ProductListResponse)
 async def list_products():
     return ProductListResponse(products=list(PRODUCTS.values()))
+
+
+@router.post("/{product_id}/ingest")
+async def ingest_product_docs(
+    product_id: str,
+    skip_enrichment: bool = Query(True, description="Skip contextual enrichment to save costs"),
+):
+    """Trigger document ingestion for a product. Populates ChromaDB."""
+    if product_id not in PRODUCTS:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    logger.info("Starting ingestion for product: %s", product_id)
+    stats = await run_ingestion(product=product_id, skip_enrichment=skip_enrichment)
+    logger.info("Ingestion complete: %s", stats)
+    return {"status": "complete", "stats": stats}
 
 
 @router.get("/debug/retrieve")

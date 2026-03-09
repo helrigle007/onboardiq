@@ -1,1 +1,5 @@
-<!-- Placeholder — implemented by agents stream. -->
+<system>
+Content curator — retrieval-only node, no LLM call needed.
+This prompt is reserved for future use if we add LLM-guided query expansion
+beyond the MultiQuery built into the HybridRetriever.
+</system>

@@ -1,19 +1,29 @@
 import asyncio
 import json
+import logging
+import time
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from statistics import mean
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.database import get_db
+from app.agents.graph import run_pipeline
+from app.config import get_settings
+from app.infrastructure.database import async_session_factory, get_db
 from app.models.schemas import (
+    GenerationMetadata,
+    GuideEvaluation,
     GuideRequest,
     GuideResponse,
+    GuideStatus,
     GuideSummary,
 )
 from app.services.guide_service import GuideService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -43,10 +53,8 @@ async def generate_guide(
     service = GuideService(db)
     guide_id = await service.create_guide(request)
 
-    # Launch pipeline in background
-    # Phase 2 will implement: background_tasks.add_task(run_pipeline, guide_id, request)
-    # For now, publish a placeholder event
-    background_tasks.add_task(_placeholder_pipeline, guide_id, request)
+    # Launch real pipeline in background
+    background_tasks.add_task(_run_generation_pipeline, guide_id, request)
 
     return {"guide_id": guide_id, "status": "generating"}
 
@@ -111,56 +119,135 @@ async def list_guides(
     return await service.list_guides(product=product, role=role, limit=limit)
 
 
-async def _placeholder_pipeline(guide_id: str, request: GuideRequest):
-    """Placeholder until Phase 2 implements real pipeline."""
-    agents = ["role_profiler", "content_curator", "guide_generator", "quality_evaluator"]
-    for agent in agents:
-        await publish_event(guide_id, {
-            "type": "agent_start",
-            "agent": agent,
-            "message": f"Starting {agent.replace('_', ' ')}...",
-        })
-        await asyncio.sleep(0.1)
-        await publish_event(guide_id, {
-            "type": "agent_complete",
-            "agent": agent,
-            "duration_ms": 100,
+async def _run_generation_pipeline(guide_id: str, request: GuideRequest) -> None:
+    """Run the full LangGraph pipeline in a background task."""
+    settings = get_settings()
+
+    # Create SSE publish closure bound to guide_id
+    async def emit(event: dict) -> None:
+        await publish_event(guide_id, event)
+
+    try:
+        # Use async_session_factory directly (not Depends — we're in a background task)
+        assert async_session_factory is not None, "Database not initialized"
+
+        # Update status to generating
+        async with async_session_factory() as db:
+            service = GuideService(db)
+            await service.update_guide_status(guide_id, GuideStatus.GENERATING)
+
+        # Run the pipeline
+        pipeline_start = time.time()
+        final_state = await run_pipeline(guide_id, request, emit)
+
+        generation_time = time.time() - pipeline_start
+
+        # Build metadata
+        metadata = GenerationMetadata(
+            model=settings.generation_model,
+            total_tokens_used=final_state.get("total_tokens", 0),
+            total_cost_usd=final_state.get("total_cost_usd", 0.0),
+            generation_time_seconds=round(generation_time, 2),
+            retrieval_latency_ms=final_state.get("retrieval_latency_ms", 0.0),
+            chunks_retrieved=final_state.get("chunks_retrieved", 0),
+            chunks_after_reranking=final_state.get("chunks_after_reranking", 0),
+            regeneration_count=final_state.get("regeneration_count", 0),
+        )
+
+        # Build evaluation
+        section_evals = final_state.get("section_evaluations", [])
+        overall_score = (
+            round(mean(e.overall_score for e in section_evals), 4)
+            if section_evals
+            else 0.0
+        )
+
+        evaluation = GuideEvaluation(
+            guide_id=guide_id,
+            overall_score=overall_score,
+            section_evaluations=section_evals,
+            generation_metadata=metadata,
+        )
+
+        # Build guide response
+        sections = final_state.get("sections", [])
+        guide_response = GuideResponse(
+            id=guide_id,
+            product=request.product,
+            role=request.role,
+            title=(
+                f"{request.product.value.title()} Onboarding: "
+                f"{request.role.value.replace('_', ' ').title()}"
+            ),
+            description=(
+                f"A personalized {request.experience_level.value}-level "
+                f"onboarding guide for "
+                f"{request.role.value.replace('_', ' ')}s integrating "
+                f"{request.product.value.title()}."
+            ),
+            sections=sections,
+            evaluation=evaluation,
+            metadata=metadata,
+            created_at=datetime.now(UTC),
+        )
+
+        # Persist results
+        async with async_session_factory() as db:
+            service = GuideService(db)
+            await service.save_guide_result(
+                guide_id=guide_id,
+                sections=[s.model_dump() for s in sections],
+                evaluation=evaluation.model_dump(),
+                metadata=metadata.model_dump(),
+            )
+
+            # Save evaluation run
+            dim_scores = {}
+            for ev in section_evals:
+                for dim in ev.dimensions:
+                    if dim.dimension not in dim_scores:
+                        dim_scores[dim.dimension] = []
+                    dim_scores[dim.dimension].append(dim.score)
+            avg_dim_scores = {k: round(mean(v), 4) for k, v in dim_scores.items()}
+
+            await service.save_evaluation_run(
+                guide_id=guide_id,
+                overall_score=overall_score,
+                dimension_scores=avg_dim_scores,
+                section_scores=[e.model_dump() for e in section_evals],
+                tokens_used=metadata.total_tokens_used,
+                cost_usd=metadata.total_cost_usd,
+                latency_seconds=generation_time,
+            )
+
+        # Emit guide_complete SSE
+        await emit({
+            "type": "guide_complete",
+            "guide": guide_response.model_dump(mode="json"),
         })
 
-    await publish_event(guide_id, {
-        "type": "guide_complete",
-        "guide": {
-            "id": guide_id,
-            "product": request.product.value,
-            "role": request.role.value,
-            "title": f"Placeholder Guide for {request.role.value}",
-            "description": "This is a placeholder. Real pipeline coming in Phase 2.",
-            "sections": [],
-            "evaluation": {
-                "guide_id": guide_id,
-                "overall_score": 0.0,
-                "section_evaluations": [],
-                "generation_metadata": {
-                    "model": "placeholder",
-                    "total_tokens_used": 0,
-                    "total_cost_usd": 0.0,
-                    "generation_time_seconds": 0.0,
-                    "retrieval_latency_ms": 0.0,
-                    "chunks_retrieved": 0,
-                    "chunks_after_reranking": 0,
-                    "regeneration_count": 0,
-                },
-            },
-            "metadata": {
-                "model": "placeholder",
-                "total_tokens_used": 0,
-                "total_cost_usd": 0.0,
-                "generation_time_seconds": 0.0,
-                "retrieval_latency_ms": 0.0,
-                "chunks_retrieved": 0,
-                "chunks_after_reranking": 0,
-                "regeneration_count": 0,
-            },
-            "created_at": datetime.now(UTC).isoformat(),
-        },
-    })
+        logger.info(
+            "Guide %s complete: %.3f score, %d tokens, $%.4f, %.1fs",
+            guide_id,
+            overall_score,
+            metadata.total_tokens_used,
+            metadata.total_cost_usd,
+            generation_time,
+        )
+
+    except Exception:
+        logger.exception("Pipeline failed for guide %s", guide_id)
+
+        # Update status to failed
+        try:
+            async with async_session_factory() as db:
+                service = GuideService(db)
+                await service.update_guide_status(guide_id, GuideStatus.FAILED)
+        except Exception:
+            logger.exception("Failed to update guide status to FAILED")
+
+        await emit({
+            "type": "error",
+            "message": "Guide generation failed. Please try again.",
+            "recoverable": False,
+        })
