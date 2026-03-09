@@ -14,16 +14,13 @@
 </p>
 
 <!-- TODO: Add demo GIF here -->
-<!-- <p align="center"><img src="docs/assets/demo.gif" width="720" /></p> -->
+<p align="center"><img src="docs/assets/demo.gif" width="720" /></p>
 
 ## What is OnboardIQ?
 
 OnboardIQ ingests SaaS product documentation and generates personalized onboarding guides tailored to the reader's role, experience level, and tech stack. A Security Engineer sees API key rotation policies and PCI compliance; a Frontend Developer sees SDK quickstarts and client-side error handling. Same docs, radically different output.
 
 Every guide passes through a 5-dimension quality evaluation pipeline that automatically regenerates low-scoring sections. The result is production-grade onboarding content that adapts to who is reading it.
-
-<!-- SCREENSHOT 1: Hero shot of the main dashboard / guide viewer UI -->
-![OnboardIQ Dashboard](docs/images/dashboard.png)
 
 ## Key Features
 
