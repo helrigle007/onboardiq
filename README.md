@@ -22,6 +22,9 @@ OnboardIQ ingests SaaS product documentation and generates personalized onboardi
 
 Every guide passes through a 5-dimension quality evaluation pipeline that automatically regenerates low-scoring sections. The result is production-grade onboarding content that adapts to who is reading it.
 
+<!-- SCREENSHOT 1: Hero shot of the main dashboard / guide viewer UI -->
+![OnboardIQ Dashboard](docs/images/dashboard.png)
+
 ## Key Features
 
 - **Multi-agent LangGraph pipeline** — Four specialized agents (Role Profiler, Content Curator, Guide Generator, Quality Evaluator) collaborate through a state-machine workflow with conditional routing
